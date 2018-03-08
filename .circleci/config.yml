@@ -1,0 +1,81 @@
+```version: 2
+
+jobs:
+  build:
+    docker:
+      - image: circleci/node:7.10
+
+    working_directory: ~/www
+    steps:
+      - checkout
+
+      - restore_cache:
+          keys:
+          - v1-dependencies-{{ checksum "package.json" }}
+          - v1-dependencies-
+      - run:
+          name: Install Nde dependencie
+          command: yarn install
+      - save_cache:
+          paths:
+            - node_modules
+          key: v1-dependencies-{{ checksum "package.json" }}
+      - run:
+          name: Run eslint on application
+          command: yarn lint
+      - run:
+          name: Run application test suite
+          command: yarn test
+      - run:
+          name: Build application
+          command: yarn build
+      - persist_to_workspace:
+          root: ~/www
+          paths:
+            - ./
+
+  deploy_qas:
+    docker:
+      - image: circleci/node:7.10
+
+    working_directory: ~/www
+    steps:
+      - attach_workspace:
+          at: ~/www
+      - run:
+          name: Deploy Develop to Firebase
+          command: ./node_modules/.bin/firebase deploy --project qas --token='1/7yZ64Dz9a61OOTt-8c39_gnx0Bb9a3V5gqaNqc7Cgto' --non-interactive
+
+  deploy_prd:
+    docker:
+      - image: circleci/node:7.10
+
+    working_directory: ~/www
+    steps:
+      - attach_workspace:
+          at: ~/www
+      - run:
+          name: Deploy Production to Firebase
+          command: ./node_modules/.bin/firebase deploy --project prd --token='1/7yZ64Dz9a61OOTt-8c39_gnx0Bb9a3V5gqaNqc7Cgto' --non-interactive
+
+workflows:
+  version: 2
+
+  build_and_deploy:
+    jobs:
+      - build
+
+      - deploy_qas:
+          requires:
+            - build
+          filters:
+            branches:
+              only: master
+
+      - deploy_prd:
+          requires:
+            - build
+          filters:
+            branches:
+              only: production
+```
